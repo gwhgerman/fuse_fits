@@ -20,11 +20,6 @@ from astropy.io import fits
 
 DEBUG=True
 #TESTFILE = "/home/ger063/Downloads/l1448_13co.fits"
-
-def thread_function(name,a,b):
-    logging.info("Thread %s: starting", name)
-    time.sleep(5)
-    logging.info("Thread %s: finishing", name)
     
 def thread_FUSE(hdul,root,mountpoint):
     ''' Run FUSE mount in a thread '''
