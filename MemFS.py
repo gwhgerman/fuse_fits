@@ -124,7 +124,7 @@ class MemFS(Operations):
         dirents = ['.', '..']
         if os.path.isdir(full_path):
             #dirents.extend(os.listdir(full_path))
-            dirents.extend(["testfile1.txt","testfile2.txt"])
+            #dirents.extend(["testfile1.txt","testfile2.txt"])
             dirlisting = os.path.basename(self.HDUList._file.name)
             dirents.extend([dirlisting])
         for r in dirents:
@@ -233,12 +233,6 @@ class MemFS(Operations):
                     vfile.write(b'\x00')
         return vfile.getvalue()[offset:offset+length]
                             
-        if (path.find("testfile1")):
-            return self.test1_content[offset:offset+length].encode('utf-8')
-        elif (path.find("testfile2")):
-            return self.test2_content[offset:offset+length].encode('utf-8')
-        else:
-            return "File not found".encode('utf-8')
         
     def write(self, path, buf, offset, fh):
         os.lseek(fh, offset, os.SEEK_SET)
