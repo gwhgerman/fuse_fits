@@ -37,7 +37,7 @@ class MemFS(Operations):
     '''
 
 
-    def __init__(self, hdr,data3D, root,DEBUG):
+    def __init__(self, hdr,data3D, root,DEBUG, flatten=True):
         '''
         Constructor - we assume only 1 data object in the incoming arrays
         '''
@@ -45,7 +45,10 @@ class MemFS(Operations):
 #        self.HDUList = HDUList
 #        self.filesize = HDUList[0].filebytes()
         self.header = hdr
-        self.data = self._flatten(data3D)
+        if flattten:
+            self.data = self._flatten(data3D)
+        else:
+            self.data = data3D
         self.filesize = (abs(hdr[BITPIX]/8)*len(self.data)) + HDR_BASESIZE
         self.root = root
         if (os.path.exists(root) != True):
