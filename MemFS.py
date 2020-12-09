@@ -2,6 +2,12 @@
 Created on 30 Nov 2020
 
 @author: ger063
+
+This class uses a dictionary of metadata in FITS Header format and a 3D data array of floats
+to reconstruct a FITS file in memory and feed it via FUSE as if it was a real file in a
+filesystem directory.
+
+It currently only provides data on a single object (partition) in FITS format.
 '''
 #!/usr/bin/env python
 
