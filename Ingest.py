@@ -17,17 +17,32 @@ from fuse import FUSE, FuseOSError, Operations
 import MemFS
 
 from astropy.io import fits
+from aifc import data
 
 DEBUG=True
 #TESTFILE = "/home/ger063/Downloads/l1448_13co.fits"
+
+def extractFromFits(fitsfile):
+    ''' Return the FITS hdr as a dict and the FITS data
+        as a 3D array of floats.
+    '''
+    hdr = {}
+    data3D =[[[]]]
+    with fits.open(TESTFILE) as hdul:
+        hdul.info()
+        for key in hdul[0].header:
+            hdr[key] = hdul[0].header[key]
+            data3D = hdul[0],data
+    return hdr,data3D
     
-def thread_FUSE(hdul,root,mountpoint):
+    
+def thread_FUSE(hdr,data3D,root,mountpoint):
     ''' Run FUSE mount in a thread '''
     if DEBUG:
         logging.info("Thread FUSE: starting")
     # To actually run in a thread, set 'foreground=False', but note that you'll have to
     # use 'ps' to find and kill the fuse process if you do!
-    FUSE(MemFS.MemFS(hdul,root,DEBUG), mountpoint, direct_io=True, nothreads=True, foreground=True, big_writes=True)
+    FUSE(MemFS.MemFS(hdr,data3D,root,DEBUG), mountpoint, direct_io=True, nothreads=True, foreground=True, big_writes=True)
     if DEBUG:
         logging.info("Thread FUSE: finishing")
     
@@ -49,8 +64,13 @@ if __name__ == "__main__":
     if len(sys.argv) < 3:
         usage()
         sys.exit()
-    # Use the user's FITS file
+    # For testing, we use the user's FITS file
+    # Normally you'd have the FITS fileheader in a dict, and your 
+    # data in a 3D array.
     TESTFILE = sys.argv[1]
+    # Extract the header and data
+    header,data3D = extractFromFits(TESTFILE)
+    
     # this is the 'dummy' directory that FUSE will serve up as a replacement
     mountpoint = sys.argv[2]
     # not used in this implementation
@@ -62,21 +82,24 @@ if __name__ == "__main__":
     mem_fits = None
     thr = None
     
-    with fits.open(TESTFILE) as hdul:
-        hdul.info()
-        for key in hdul[0].header:
-            print("%s : %s" % (key,hdul[0].header[key]))
+#    with fits.open(TESTFILE) as hdul:
+#        hdul.info()
+#        for key in hdul[0].header:
+#            print("%s : %s" % (key,hdul[0].header[key]))
         #print(hdul[0].data)
         #mem_fits = MemFS.MemFS(hdul,mountpoint)
             
         #FUSE(MemFS.MemFS(hdul,root), mountpoint, nothreads=True, foreground=True)
-        if DEBUG:
-            logging.info("Main    : before creating thread")
-        thr = threading.Thread(target=thread_FUSE, args=(hdul,root,mountpoint))
-        if DEBUG:
-            logging.info("Main    : before running thread")
-        thr.start()
-        if DEBUG:
-            logging.info("FUSE thread started")
-        thr.join() 
+    if DEBUG:
+        logging.info("Main    : before creating thread")
+    thr = threading.Thread(target=thread_FUSE, args=(header,data3D,root,mountpoint))
+    if DEBUG:
+        logging.info("Main    : before running thread")
+    thr.start()
+    if DEBUG:
+        logging.info("FUSE thread started")
+    thr.join()
+    # Call this when you're done, otherwise use 'ps aux fuse' to find and 
+    # kill the process
+    os.system("fusermount -u %s" % mountpoint) 
     print("Done")

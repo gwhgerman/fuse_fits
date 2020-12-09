@@ -31,13 +31,16 @@ class MemFS(Operations):
     '''
 
 
-    def __init__(self, HDUList, root,DEBUG):
+    def __init__(self, hdr,data3D, root,DEBUG):
         '''
-        Constructor
+        Constructor - we assume only 1 data object in the incoming arrays
         '''
         print("IN MemFS INIT")
-        self.HDUList = HDUList
-        self.filesize = HDUList[0].filebytes()
+#        self.HDUList = HDUList
+#        self.filesize = HDUList[0].filebytes()
+        self.header = hdr
+        self.data = self._flatten(data3D)
+        self.filesize = (abs(hdr[BITPIX]/8)*len(self.data)) + HDR_BASESIZE
         self.root = root
         if (os.path.exists(root) != True):
             os.mkdir(root)
@@ -196,17 +199,21 @@ class MemFS(Operations):
             print ("IN READ FUSE")
         if (path.endswith(".fits")):
             vfile = BytesIO()
-            for fits_obj in self.HDUList:
+#            for fits_obj in self.HDUList:
+            for i in range(1):       # TODO - consider multi ojbects in arrays
                 header = []
                 data = np.array([])
                 key = ""
                 # process the header
-                for key in fits_obj.header:
+#                for key in fits_obj.header:
+                for key in self.header:
                     # substitute HDU values with appropriate FITS variable
                     if (key == "SIMPLE"):
-                        fits_obj.header[key] = 'T' if (fits_obj.header[key]) else 'F'
+#                        fits_obj.header[key] = 'T' if (fits_obj.header[key]) else 'F'
+                        self.header[key] = 'T' if (self.header[key]) else 'F'
                     # All lines of the header must be 80 char length
-                    line = "%s  =  %s" % (key,fits_obj.header[key])
+#                    line = "%s  =  %s" % (key,fits_obj.header[key])
+                    line = "%s  =  %s" % (key,self.header[key])
                     line_size = len(line)
                     for i in range (80-line_size):
                         line += " "
@@ -222,11 +229,16 @@ class MemFS(Operations):
                 hdr_size = len(vfile.getvalue())
                 # process data
                 data_size=0
-                incr = int(abs(fits_obj.header["BITPIX"])/8) 
-                if (len(fits_obj.data)>0):
-                    data = self._flatten(fits_obj.data)
-                    vfile.write(data)
-                data_size = hdr_size+(incr*data.size)                  
+#                incr = int(abs(fits_obj.header["BITPIX"])/8) 
+                incr = int(abs(self.header["BITPIX"])/8) 
+#                if (len(fits_obj.data)>0):
+#                    data = self._flatten(fits_obj.data)
+                if (len(self.data)>0):
+#                    data = self._flatten(fits_obj.data)
+#                    vfile.write(data)
+                    vfile.write(self.data)
+#                data_size = hdr_size+(incr*data.size)                  
+                data_size = hdr_size+(incr*self.data.size)                  
                 # data must be of size 2880 bytes or multiple of
                 pad = (HDR_BASESIZE - data_size) if (data_size < HDR_BASESIZE) else (HDR_BASESIZE - (data_size % HDR_BASESIZE))
                 for i in range(pad):
