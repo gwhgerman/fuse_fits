@@ -16,4 +16,7 @@ Standard ops such as 'cat' will appear to read the file, but are actually
 passed the data in mem.
 
 Note the example in Ingest can run in a thread (see Ingest.thread_FUSE. 
-It's up to you how you want to terminate it!
+If not, use 'fusermount -u <path_to_dummy_dir_to_mount>' to unmount when 
+finished.
+
+
