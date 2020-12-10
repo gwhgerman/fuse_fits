@@ -17,7 +17,7 @@ from fuse import FUSE, FuseOSError, Operations
 import MemFS
 
 from astropy.io import fits
-from aifc import data
+#from aifc import data
 
 DEBUG=True
 #TESTFILE = "/home/ger063/Downloads/l1448_13co.fits"
@@ -32,7 +32,7 @@ def extractFromFits(fitsfile):
         hdul.info()
         for key in hdul[0].header:
             hdr[key] = hdul[0].header[key]
-            data3D = hdul[0],data
+            data3D = hdul[0].data
     return hdr,data3D
     
     

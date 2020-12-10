@@ -30,6 +30,7 @@ from scipy.io.matlab.miobase import arr_dtype_number
 from os_ken.services.protocols.bgp.operator.commands import root
 
 HDR_BASESIZE = 2880
+FILENAME = "inMemFITS.fits"
 
 class MemFS(Operations):
     '''
@@ -45,11 +46,11 @@ class MemFS(Operations):
 #        self.HDUList = HDUList
 #        self.filesize = HDUList[0].filebytes()
         self.header = hdr
-        if flattten:
+        if flatten:
             self.data = self._flatten(data3D)
         else:
             self.data = data3D
-        self.filesize = (abs(hdr[BITPIX]/8)*len(self.data)) + HDR_BASESIZE
+        self.filesize = int((abs(hdr["BITPIX"]/8)*len(self.data)) + HDR_BASESIZE)
         self.root = root
         if (os.path.exists(root) != True):
             os.mkdir(root)
@@ -137,7 +138,7 @@ class MemFS(Operations):
         if os.path.isdir(full_path):
             #dirents.extend(os.listdir(full_path))
             #dirents.extend(["testfile1.txt","testfile2.txt"])
-            dirlisting = os.path.basename(self.HDUList._file.name)
+            dirlisting = os.path.basename(FILENAME)
             dirents.extend([dirlisting])
         for r in dirents:
             yield r
