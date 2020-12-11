@@ -5,7 +5,7 @@ Created on 30 Nov 2020
 
 This class uses a dictionary of metadata in FITS Header format and a 3D data array of floats
 to reconstruct a FITS file in memory and feed it via FUSE as if it was a real file in a
-filesystem directory.
+filesystem directory. It will also accept a flattened data array.
 
 It currently only provides data on a single object (partition) in FITS format.
 '''
@@ -18,16 +18,12 @@ import sys
 import errno
 import stat
 import time
-import struct
 import numpy as np
 from io import BytesIO
 
 
 from fuse import FUSE, FuseOSError, Operations
-from datetime import datetime
-from astropy.units.equivalencies import dimensionless_angles
-from scipy.io.matlab.miobase import arr_dtype_number
-from os_ken.services.protocols.bgp.operator.commands import root
+
 
 HDR_BASESIZE = 2880
 FILENAME = "inMemFITS.fits"
@@ -36,21 +32,27 @@ class MemFS(Operations):
     '''
     classdocs
     '''
+    NUMCHUNKSREAD = 0
+    vfile = BytesIO()
 
-
-    def __init__(self, hdr,data3D, root,DEBUG, flatten=True):
+    def __init__(self, hdr,data3D, root,DEBUG, flatten_it=True):
         '''
         Constructor - we assume only 1 data object in the incoming arrays
         '''
-        print("IN MemFS INIT")
+        if DEBUG:
+            print("IN MemFS INIT")
 #        self.HDUList = HDUList
 #        self.filesize = HDUList[0].filebytes()
         self.header = hdr
-        if flatten:
+        # FITS header consists of 'cards' of 80 bytes each + terminating 'END' card 
+        self.len_hdr = (len(hdr)+1)*80
+        # They are then padded out with blanks to nearest multiple of 2880 bytes
+        self.pad = (HDR_BASESIZE - self.len_hdr) if (self.len_hdr < HDR_BASESIZE) else (HDR_BASESIZE -(self.len_hdr % HDR_BASESIZE))
+        if flatten_it:
             self.data = self._flatten(data3D)
         else:
             self.data = data3D
-        self.filesize = int((abs(hdr["BITPIX"]/8)*len(self.data)) + HDR_BASESIZE)
+        self.filesize = int((abs(hdr["BITPIX"]/8)*len(self.data)) + self.len_hdr + self.pad)
         self.root = root
         if (os.path.exists(root) != True):
             os.mkdir(root)
@@ -80,9 +82,12 @@ class MemFS(Operations):
             
     def _flatten(self, arr):
         '''
-            Assumes a numpy n (>1) dim array and flattens it.
+            Assumes a numpy n (>1) dim array and flattens it. We use ravel() rather
+            than flatten(), as we don't need access to both the flattened and unflattened
+            versions - ravel returns a reference, so doesn't make yet-another-array in 
+            memory.
         '''
-        arr.flatten()
+        arr=arr.ravel()
         
         return arr
         
@@ -136,8 +141,6 @@ class MemFS(Operations):
 
         dirents = ['.', '..']
         if os.path.isdir(full_path):
-            #dirents.extend(os.listdir(full_path))
-            #dirents.extend(["testfile1.txt","testfile2.txt"])
             dirlisting = os.path.basename(FILENAME)
             dirents.extend([dirlisting])
         for r in dirents:
@@ -208,52 +211,55 @@ class MemFS(Operations):
         if self.DEBUG:
             print ("IN READ FUSE")
         if (path.endswith(".fits")):
-            vfile = BytesIO()
+            #vfile = BytesIO()
 #            for fits_obj in self.HDUList:
-            for i in range(1):       # TODO - consider multi ojbects in arrays
+            if MemFS.NUMCHUNKSREAD == 0:
+            #for i in range(1):       # TODO - consider multi ojbects in arrays
                 header = []
                 data = np.array([])
                 key = ""
                 # process the header
-#                for key in fits_obj.header:
                 for key in self.header:
                     # substitute HDU values with appropriate FITS variable
-                    if (key == "SIMPLE"):
-#                        fits_obj.header[key] = 'T' if (fits_obj.header[key]) else 'F'
+                    if key in ["SIMPLE","EXTEND"] :
                         self.header[key] = 'T' if (self.header[key]) else 'F'
-                    # All lines of the header must be 80 char length
-#                    line = "%s  =  %s" % (key,fits_obj.header[key])
-                    line = "%s  =  %s" % (key,self.header[key])
+                    # All lines of the header must be 80 char length 
+                    # PLUS - the key + '=' MUST total 9 bytes - Fortran rears it's ugly head .....
+                    mystr = key[0:8]
+                    pad = 8 - len(mystr)
+                    for i in range(pad):
+                        mystr += " "
+                    if key not in ["COMMENT","HISTORY"]:
+                        mystr += "="
+                    if isinstance(self.header[key], str) and len(self.header[key]) > 1:
+                        line = "%s '%s'" % (mystr,self.header[key])
+                    else:
+                        line = "%s %s" % (mystr,self.header[key])
                     line_size = len(line)
                     for i in range (80-line_size):
                         line += " "
-                    vfile.write(line.encode('utf-8'))
+                    MemFS.vfile.write(line.encode('utf-8'))
                 # Last field should be 'END'
                 if not (key.startswith("END")):
-                    vfile.write("END".encode('utf-8') + " ".encode('utf-8')*77)
+                    MemFS.vfile.write("END".encode('utf-8') + " ".encode('utf-8')*77)
                 # header must be of size 2880 bytes or multiple of
-                hdr_size = len(vfile.getvalue())
-                pad = (HDR_BASESIZE - hdr_size) if (hdr_size < HDR_BASESIZE) else (HDR_BASESIZE -(hdr_size % HDR_BASESIZE))
-                for i in range(pad):
-                    vfile.write(b'\x20')
-                hdr_size = len(vfile.getvalue())
+                #hdr_size = len(vfile.getvalue())
+                #pad = (HDR_BASESIZE - hdr_size) if (hdr_size < HDR_BASESIZE) else (HDR_BASESIZE -(hdr_size % HDR_BASESIZE))
+                for i in range(self.pad):
+                    MemFS.vfile.write(b'\x20')
+                hdr_size = len(MemFS.vfile.getvalue())
                 # process data
                 data_size=0
-#                incr = int(abs(fits_obj.header["BITPIX"])/8) 
                 incr = int(abs(self.header["BITPIX"])/8) 
-#                if (len(fits_obj.data)>0):
-#                    data = self._flatten(fits_obj.data)
                 if (len(self.data)>0):
-#                    data = self._flatten(fits_obj.data)
-#                    vfile.write(data)
-                    vfile.write(self.data)
-#                data_size = hdr_size+(incr*data.size)                  
+                    MemFS.vfile.write(self.data)
                 data_size = hdr_size+(incr*self.data.size)                  
                 # data must be of size 2880 bytes or multiple of
                 pad = (HDR_BASESIZE - data_size) if (data_size < HDR_BASESIZE) else (HDR_BASESIZE - (data_size % HDR_BASESIZE))
                 for i in range(pad):
-                    vfile.write(b'\x00')
-        return vfile.getvalue()[offset:offset+length]
+                    MemFS.vfile.write(b'\x00')
+                MemFS.NUMCHUNKSREAD += 1
+        return MemFS.vfile.getvalue()[offset:offset+length]
                             
         
     def write(self, path, buf, offset, fh):

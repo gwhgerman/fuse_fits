@@ -17,9 +17,8 @@ from fuse import FUSE, FuseOSError, Operations
 import MemFS
 
 from astropy.io import fits
-#from aifc import data
 
-DEBUG=True
+DEBUG=False
 #TESTFILE = "/home/ger063/Downloads/l1448_13co.fits"
 
 def extractFromFits(fitsfile):
@@ -29,10 +28,10 @@ def extractFromFits(fitsfile):
     hdr = {}
     data3D =[[[]]]
     with fits.open(TESTFILE) as hdul:
-        hdul.info()
         for key in hdul[0].header:
             hdr[key] = hdul[0].header[key]
             data3D = hdul[0].data
+        hdul.info()
     return hdr,data3D
     
     
@@ -76,20 +75,11 @@ if __name__ == "__main__":
     # not used in this implementation
     root = "/tmp"
     
-    format = "%(asctime)s: %(message)s"
-    logging.basicConfig(format=format, level=logging.INFO,
+    form = "%(asctime)s: %(message)s"
+    logging.basicConfig(format=form, level=logging.INFO,
                         datefmt="%H:%M:%S")
-    mem_fits = None
     thr = None
     
-#    with fits.open(TESTFILE) as hdul:
-#        hdul.info()
-#        for key in hdul[0].header:
-#            print("%s : %s" % (key,hdul[0].header[key]))
-        #print(hdul[0].data)
-        #mem_fits = MemFS.MemFS(hdul,mountpoint)
-            
-        #FUSE(MemFS.MemFS(hdul,root), mountpoint, nothreads=True, foreground=True)
     if DEBUG:
         logging.info("Main    : before creating thread")
     thr = threading.Thread(target=thread_FUSE, args=(header,data3D,root,mountpoint))
@@ -98,6 +88,7 @@ if __name__ == "__main__":
     thr.start()
     if DEBUG:
         logging.info("FUSE thread started")
+    # As the thread doesn't terminate, this will never happen:
     thr.join()
     # Call this when you're done, otherwise use 'ps aux fuse' to find and 
     # kill the process
