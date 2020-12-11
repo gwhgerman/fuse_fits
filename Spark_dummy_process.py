@@ -42,6 +42,7 @@ def thread_FUSE(hdr,data3D,root,mountpoint):
     # To actually run in a thread, set 'foreground=False', but note that you'll have to
     # use 'ps' to find and kill the fuse process if you do!
     FUSE(MemFS.MemFS(hdr,data3D,root,DEBUG), mountpoint, direct_io=True, nothreads=True, foreground=True, big_writes=True)
+#            , max_read=524288, max_write= 524288)
     if DEBUG:
         logging.info("Thread FUSE: finishing")
     

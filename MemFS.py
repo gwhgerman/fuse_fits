@@ -3,7 +3,7 @@ Created on 30 Nov 2020
 
 @author: ger063
 
-This class uses a dictionary of metadata in FITS Header format and a 3D data array of floats
+This class uses a dictionary of metadata in FITS Header format and a multi-dim data array of floats
 to reconstruct a FITS file in memory and feed it via FUSE as if it was a real file in a
 filesystem directory. It will also accept a flattened data array.
 
@@ -212,11 +212,9 @@ class MemFS(Operations):
             print ("IN READ FUSE")
         if (path.endswith(".fits")):
             #vfile = BytesIO()
+            #for i in range(1):       # TODO - consider multi ojbects in arrays
 #            for fits_obj in self.HDUList:
             if MemFS.NUMCHUNKSREAD == 0:
-            #for i in range(1):       # TODO - consider multi ojbects in arrays
-                header = []
-                data = np.array([])
                 key = ""
                 # process the header
                 for key in self.header:
@@ -258,7 +256,7 @@ class MemFS(Operations):
                 pad = (HDR_BASESIZE - data_size) if (data_size < HDR_BASESIZE) else (HDR_BASESIZE - (data_size % HDR_BASESIZE))
                 for i in range(pad):
                     MemFS.vfile.write(b'\x00')
-                MemFS.NUMCHUNKSREAD += 1
+            MemFS.NUMCHUNKSREAD += 1
         return MemFS.vfile.getvalue()[offset:offset+length]
                             
         
@@ -279,6 +277,8 @@ class MemFS(Operations):
     def release(self, path, fh):
         if self.DEBUG:
             print ("IN RELEASE FUSE")
+        MemFS.vfile = BytesIO()
+        MemFS.NUMCHUNKSREAD = 0
         return os.close(fh)
 
     def fsync(self, path, fdatasync, fh):
